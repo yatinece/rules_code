@@ -1,0 +1,7 @@
+=== FRAUD DETECTION RULES SUMMARY ===
+
+Detection rate: 0.0000%
+Individual rules found: 0
+Ensemble rules created: 0
+
+TOP 5 INDIVIDUAL RULES:

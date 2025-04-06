@@ -1,0 +1,17 @@
+=== FRAUD DETECTION RULES SUMMARY ===
+
+Detection rate: 100.0000%
+Individual rules found: 2
+
+TOP 5 INDIVIDUAL RULES:
+
+Rule #1 (from Run 3):
+  if V2 > 0.6867713983784335
+  if V4 > 0.2482828618264712
+  if V10 < 0.5341021275967641
+  if V11 > 0.39249191475356593
+Fraud count: 383 (7.5157% precision)
+
+Rule #2 (from Run final):
+  Default: Catch-all
+Fraud count: 109 (0.0390% precision)

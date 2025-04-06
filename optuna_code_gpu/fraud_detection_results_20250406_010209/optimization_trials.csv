@@ -1,0 +1,2 @@
+Trial,Score,Num_Rules,Avg_Fraud_Rate,Fraud_Detection_Rate,max_rules_per_run,min_subset_size_absolute,min_subset_size_percent,max_iterations,num_runs,ga_num_generations,ga_population_size,ga_num_parents,ga_mutation_percent,max_features_per_rule,feature_reuse_penalty,min_threshold_value,LESS_LOOKUP_RULE_POSITION
+0,1.04,2,0.06644151766920742,1.0,4,35,0.009074483799758198,6,1,179,46,28,40,5,0.502168966174342,0.00131808896236487,4

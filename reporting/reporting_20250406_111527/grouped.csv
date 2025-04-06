@@ -1,0 +1,15 @@
+Rule_4_1,Rule_1_2,Rule_4_4,Rule_3_4,Rule_3_1,Rule_4_3,Class,Amount,Total_Rows
+False,False,False,False,False,False,125,24974288.58,1
+False,False,False,False,True,False,3,7486.96,1
+False,False,False,True,False,False,4,102412.56,1
+False,True,False,False,False,False,8,6.68,1
+False,True,False,True,False,False,2,1.77,1
+True,False,False,False,False,False,1,829.41,1
+True,False,False,False,True,False,190,63047.48,1
+True,False,False,True,True,False,17,3049.95,1
+True,False,True,False,True,False,24,908.02,1
+True,True,False,False,True,False,77,6363.95,1
+True,True,False,True,False,False,1,0.77,1
+True,True,False,True,True,False,15,2182.99,1
+True,True,True,False,True,False,21,2006.8899999999999,1
+True,True,True,True,True,False,4,4.0,1

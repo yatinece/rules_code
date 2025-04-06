@@ -1,0 +1,4 @@
+Ensemble_Rule_Number,Component_Rules,Component_Details,Subset_Size,Fraud_Rate,Fraud_Count
+1,Rule #1 OR Rule #2,Rule 1: V4 > 0.4363; V5 < 1.0000; V25 < 0.9950 | Rule 2: V4 > 0.3789; V17 < 1.0000,12512,0.027573529411764705,345
+2,Rule #1 OR Rule #3,Rule 1: V4 > 0.4363; V5 < 1.0000; V25 < 0.9950 | Rule 3: V9 < 0.3629; V11 > 0.6158; V21 < 1.0000; Amount < 1.0000,5737,0.05490674568589855,315
+3,Rule #2 OR Rule #3,Rule 2: V4 > 0.3789; V17 < 1.0000 | Rule 3: V9 < 0.3629; V11 > 0.6158; V21 < 1.0000; Amount < 1.0000,11767,0.013767315373502167,162

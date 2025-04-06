@@ -9,6 +9,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
+import logging
 
 # Original configuration - will be modified by Optuna
 BASE_CONFIG = {

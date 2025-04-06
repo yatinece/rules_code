@@ -32,7 +32,6 @@ BASE_CONFIG = {
     # Rule Diversity Parameters
     'feature_reuse_penalty': 0.3,    # Penalty factor for reusing features (30% per feature)
     'min_threshold_value': 0.001,    # Minimum threshold to consider (to avoid > 0.0000)
-    'LESS_LOOKUP_RULE_POSITION' : 3
 }
 
 
@@ -44,11 +43,6 @@ BASE_CONFIG['ensemble_min_fraud_rate'] = BASE_CONFIG['min_fraud_rate'] / 2  # 50
 base_dt = pd.read_csv(BASE_CONFIG['dataset_path'])
 original_dt = base_dt.copy()
 
-
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
 # Create time-based results directory
 def create_results_directory():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -116,9 +110,9 @@ def discover_rules_with_config(config):
         
         import torch
 
-        # Move data to the appropriate device (CPU or GPU)
-        X_tensor = torch.tensor(X.values, dtype=torch.float32, device=device)
-        y_tensor = torch.tensor(y.values, dtype=torch.float32, device=device)
+        # Move data to GPU once
+        X_tensor = torch.tensor(X.values, dtype=torch.float32, device='cuda')
+        y_tensor = torch.tensor(y.values, dtype=torch.float32, device='cuda')
 
         def fitness_func(ga_instance, solution, solution_idx):
             raw_selection = solution[:num_features]
@@ -137,15 +131,15 @@ def discover_rules_with_config(config):
             thresholds = np.clip(thresholds, config['min_threshold_value'], 1.0)
             
             # Convert selection and thresholds to GPU
-            selection_tensor = torch.tensor(selection, dtype=torch.bool, device=device)
-            thresholds_tensor = torch.tensor(thresholds, dtype=torch.float32, device=device)
+            selection_tensor = torch.tensor(selection, dtype=torch.bool, device='cuda')
+            thresholds_tensor = torch.tensor(thresholds, dtype=torch.float32, device='cuda')
             
-            mask = torch.ones(X_tensor.shape[0], dtype=torch.bool, device=device)
+            mask = torch.ones(X_tensor.shape[0], dtype=torch.bool, device='cuda')
             
             for i in range(num_features):
-                if selection_tensor[i]:
+                if selection[i]:
                     col = X_tensor[:, i]
-                    if i % config["LESS_LOOKUP_RULE_POSITION"] == 0:
+                    if i % 3 == 0:
                         mask &= col < thresholds_tensor[i]
                     else:
                         mask &= col > thresholds_tensor[i]
@@ -217,7 +211,7 @@ def discover_rules_with_config(config):
                 threshold_value = thresholds[i]
                 if threshold_value <= config['min_threshold_value']:
                     continue
-                if i % config["LESS_LOOKUP_RULE_POSITION"] == 0:
+                if i % 3 == 0:
                     rule[f"{feat} <"] = threshold_value
                 else:
                     rule[f"{feat} >"] = threshold_value
@@ -397,7 +391,6 @@ def objective(trial):
         # Rule Diversity Parameters
         'feature_reuse_penalty': trial.suggest_float('feature_reuse_penalty', 0.1, 0.8),
         'min_threshold_value': trial.suggest_float('min_threshold_value', 0.0001, 0.01),
-        'LESS_LOOKUP_RULE_POSITION' : trial.suggest_int('max_features_per_rule', 3, 9)
     }
     
     print(f"\n=== Starting trial {trial.number} ===")

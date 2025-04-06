@@ -1,0 +1,64 @@
+=== FRAUD DETECTION RULES SUMMARY ===
+
+Detection rate: 81.5041%
+Individual rules found: 13
+Ensemble rules created: 22
+
+TOP 5 INDIVIDUAL RULES:
+
+Rule #1 (from Run 2):
+  if V1 < 0.9795
+  if V2 > 0.7114
+  if V3 > 0.2969
+  if V4 > 0.3333
+  if V11 > 0.4463
+Fraud count: 302 (79.0576% precision)
+
+Rule #2 (from Run 1):
+  if V1 < 1.0000
+  if V2 > 0.7123
+  if V4 > 0.3349
+  if V11 > 0.4462
+  if V24 > 0.0864
+Fraud count: 301 (76.0101% precision)
+
+Rule #3 (from Run 3):
+  if V4 > 0.3328
+  if V11 > 0.4463
+  if V15 < 1.0000
+  if V19 > 0.3890
+  if V20 > 0.5296
+Fraud count: 300 (78.3290% precision)
+
+Rule #4 (from Run 3):
+  if V2 > 0.8658
+  if V11 > 0.5687
+  if V13 > 0.2304
+  if V14 > 0.2844
+  if V23 > 0.5948
+Fraud count: 63 (4.8913% precision)
+
+Rule #5 (from Run 2):
+  if V4 > 0.3235
+  if V8 < 0.8998
+  if V11 > 0.5676
+  if V20 > 0.5604
+  if V27 > 0.3802
+Fraud count: 55 (8.8283% precision)
+
+TOP 3 ENSEMBLE RULES:
+
+Ensemble Rule #1 (from Run 3): Rule #1 OR Rule #2
+Subset size: 1,671
+Fraud rate: 21.7235%
+Fraud count: 363
+
+Ensemble Rule #2 (from Run 2): Rule #1 OR Rule #2
+Subset size: 1,005
+Fraud rate: 35.5224%
+Fraud count: 357
+
+Ensemble Rule #3 (from Run 1): Rule #1 OR Rule #3
+Subset size: 913
+Fraud rate: 38.0066%
+Fraud count: 347

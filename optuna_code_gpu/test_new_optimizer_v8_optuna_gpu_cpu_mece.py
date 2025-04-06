@@ -20,7 +20,7 @@ BASE_CONFIG = {
     'min_subset_size_absolute': 50,  # Minimum number of transactions in a subset
     'min_subset_size_percent': 0.005, # Minimum subset size as percent of data (0.5%)
     'max_iterations': 12,            # Maximum iterations per run
-    'num_runs': 3,                   # Number of runs with different random seeds
+    'num_runs': 1,                   # Number of runs with different random seeds
     
     # Genetic Algorithm Parameters
     'ga_num_generations': 150,       # Number of generations for genetic algorithm
@@ -49,7 +49,9 @@ if torch.cuda.is_available():
     device = torch.device('cuda')
 else:
     device = torch.device('cpu')
-# Create time-based results directory
+
+print(f"Using device: {device}")    
+# Create time-based results directory   
 def create_results_directory():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"fraud_detection_results_{timestamp}"
@@ -76,7 +78,7 @@ def discover_rules_with_config(config):
     # Track previously used features to encourage diversity
     previous_features = set()
     
-    # Keep track of all detected indices
+    # Keep track of the indices corresponding to the original dataset
     original_index = base_dt.index.copy()
 
     print(f"Starting with {remaining_samples:,} total samples, {remaining_frauds} frauds")
@@ -114,9 +116,7 @@ def discover_rules_with_config(config):
         # Use run_seed in addition to iteration for GA seed
         ga_seed = (iteration * 1000) + (run_seed if run_seed is not None else 0)
         
-        import torch
-
-        # Move data to the appropriate device (CPU or GPU)
+        # Prepare data for GA using PyTorch tensors on the appropriate device
         X_tensor = torch.tensor(X.values, dtype=torch.float32, device=device)
         y_tensor = torch.tensor(y.values, dtype=torch.float32, device=device)
 
@@ -136,7 +136,7 @@ def discover_rules_with_config(config):
 
             thresholds = np.clip(thresholds, config['min_threshold_value'], 1.0)
             
-            # Convert selection and thresholds to GPU
+            # Convert selection and thresholds to GPU tensors
             selection_tensor = torch.tensor(selection, dtype=torch.bool, device=device)
             thresholds_tensor = torch.tensor(thresholds, dtype=torch.float32, device=device)
             
@@ -175,7 +175,6 @@ def discover_rules_with_config(config):
 
             return reward.item()
 
-        
         ga_instance = pygad.GA(num_generations=config['ga_num_generations'],
                              num_parents_mating=config['ga_num_parents'],
                              fitness_func=fitness_func,
@@ -189,10 +188,10 @@ def discover_rules_with_config(config):
                              mutation_type="random",
                              random_seed=ga_seed)
         
-        start_time = time.time()
+        start_ga = time.time()
         ga_instance.run()
-        end_time = time.time()
-        print(f" ---------------------------------------------------------   Time taken to run GA instance : {end_time - start_time:.2f} seconds ---------------------------------------------------------")
+        end_ga = time.time()
+        print(f"GA run time: {end_ga - start_ga:.2f} seconds")
         
         solution, solution_fitness, solution_idx = ga_instance.best_solution()
         
@@ -204,9 +203,8 @@ def discover_rules_with_config(config):
         selection = raw_selection > 0.5
         if np.sum(selection) > max_features:
             sorted_idx = np.argsort(-raw_selection)
-            new_selection = np.zeros_like(selection, dtype=bool)
-            new_selection[sorted_idx[:max_features]] = True
-            selection = new_selection
+            selection = np.zeros_like(selection, dtype=bool)
+            selection[sorted_idx[:max_features]] = True
         
         thresholds = np.clip(solution[num_features:], config['min_threshold_value'], 1.0)
         selected_features = X.columns[selection]
@@ -232,7 +230,6 @@ def discover_rules_with_config(config):
                 mask &= (X[actual_feat] > thresh)
         
         subset = y[mask]
-        subset_times = time_values[mask]
         subset_size = len(subset)
         
         if subset_size == 0:
@@ -248,6 +245,7 @@ def discover_rules_with_config(config):
         
         rule_indices = original_index[mask]
         
+        # Update previous features for diversity
         for feat_key in rule.keys():
             feat_name = feat_key.split(" ")[0]
             previous_features.add(feat_name)
@@ -270,10 +268,9 @@ def discover_rules_with_config(config):
         print(f"Fraud rate in subset: {final_fraud_rate:.4%}")
         print(f"Fraud count in subset: {fraud_count}")
         
-        # (Optional time-distribution analysis removed for brevity)
-        
         rules.append(rule_stats)
         
+        # Remove samples covered by this rule to enforce mutual exclusivity
         base_dt = base_dt[~mask].copy()
         original_index = original_index[~mask]
         remaining_samples = len(base_dt)
@@ -284,7 +281,22 @@ def discover_rules_with_config(config):
         
         if len(rules) >= config['max_rules_per_run'] or remaining_frauds == 0:
             break
-    
+
+    # --- Add a final "catch-all" rule for collective exhaustiveness ---
+    if len(base_dt) > 0:
+        print("\n===== FINAL CATCH-ALL RULE =====")
+        catch_all_rule = {
+            'iteration': len(rules) + 1,
+            'rule': {"Default": "Covers remaining samples"},
+            'subset_size': len(base_dt),
+            'fraud_rate': base_dt['Class'].mean(),
+            'fraud_count': base_dt['Class'].sum(),
+            'rule_indices': original_index,
+            'solution_fitness': None
+        }
+        rules.append(catch_all_rule)
+        print(f"Final rule covers {len(base_dt)} samples with fraud rate {base_dt['Class'].mean():.4%}")
+
     # Create ensemble rules (pairwise combinations)
     print("\n===== ENSEMBLE RULES =====")
     ensemble_rules = []
@@ -319,7 +331,7 @@ def discover_rules_with_config(config):
         print(f"Fraud rate: {ensemble['fraud_rate']:.4%}")
         print(f"Fraud count: {ensemble['fraud_count']}")
     
-    total_fraud_count = sum(rule['fraud_count'] for rule in rules)
+    total_fraud_count = sum(rule['fraud_count'] for rule in rules if rule['fraud_count'] is not None)
     total_dataset_fraud = original_dt['Class'].sum()
     fraud_detection_rate = total_fraud_count / total_dataset_fraud if total_dataset_fraud > 0 else 0
     
@@ -385,7 +397,7 @@ def objective(trial):
         'min_subset_size_absolute': trial.suggest_int('min_subset_size_absolute', 30, 200),
         'min_subset_size_percent': trial.suggest_float('min_subset_size_percent', 0.001, 0.02),
         'max_iterations': trial.suggest_int('max_iterations', 5, 20),
-        'num_runs':  trial.suggest_int('num_runs',1, 3),
+        'num_runs':  trial.suggest_int('num_runs',1, 1),
         
         # Genetic Algorithm Parameters
         'ga_num_generations': trial.suggest_int('ga_num_generations', 50, 300),
@@ -397,7 +409,7 @@ def objective(trial):
         # Rule Diversity Parameters
         'feature_reuse_penalty': trial.suggest_float('feature_reuse_penalty', 0.1, 0.8),
         'min_threshold_value': trial.suggest_float('min_threshold_value', 0.0001, 0.01),
-        'LESS_LOOKUP_RULE_POSITION' : trial.suggest_int('max_features_per_rule', 3, 9)
+        'LESS_LOOKUP_RULE_POSITION' : trial.suggest_int('LESS_LOOKUP_RULE_POSITION', 3, 9)
     }
     
     print(f"\n=== Starting trial {trial.number} ===")
@@ -427,7 +439,9 @@ def objective(trial):
         trial.set_user_attr("fraud_detection_rate", fraud_detection_rate)
         trial.set_user_attr("num_ensemble_rules", len(ensemble_rules))
         trial.set_user_attr("best_ensemble_score", best_ensemble_score)
-        
+        print(f"--------------------------------"*10)
+        print(f"Score: {score}")
+        print(f"--------------------------------"*10)
         return score
     
     except Exception as e:
@@ -439,7 +453,7 @@ def run_optimization(n_trials=50, study_name="fraud_detection_optimization"):
 
     if BASE_CONFIG['new_study_only'] == True:
         try :
-            optuna.delete_study(study_name="fraud_detection_optuna", storage="sqlite:///fraud_detection_optuna.db")
+            optuna.delete_study(study_name=study_name, storage="sqlite:///fraud_detection_optuna.db")
         except:
             pass
 
@@ -462,22 +476,26 @@ def run_optimization(n_trials=50, study_name="fraud_detection_optimization"):
     
     return study
 
-# Export rules to CSV - modified to handle ensemble rules
+def safe_float(val):
+    try:
+        return float(val)
+    except:
+        return 0.0
+
 def export_rules_to_csv(rules, results_dir, filename="rules.csv"):
     filepath = os.path.join(results_dir, filename)
     
-    # Prepare data for CSV
     csv_data = []
     for rule in rules:
-        # Convert rule dict to string representation
-        rule_str = "; ".join([f"{feat} {thresh:.4f}" for feat, thresh in rule['rule'].items()])
+        # Convert rule dict to string representation safely
+        rule_str = "; ".join([f"{feat} {safe_float(thresh):.4f}" for feat, thresh in rule['rule'].items()])
         
         csv_data.append({
             'Run': rule.get('run', 1),
             'Iteration': rule['iteration'],
             'Rule': rule_str,
             'Subset_Size': rule['subset_size'],
-            'Fraud_Rate': rule['fraud_rate'],
+            'Fraud_Rate': safe_float(rule['fraud_rate']),
             'Fraud_Count': rule['fraud_count'],
             'Fitness_Score': rule['solution_fitness']
         })
@@ -487,106 +505,126 @@ def export_rules_to_csv(rules, results_dir, filename="rules.csv"):
     
     # Write to CSV
     with open(filepath, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=csv_data[0].keys() if csv_data else [])
-        writer.writeheader()
-        writer.writerows(csv_data)
+        if csv_data:
+            writer = csv.DictWriter(f, fieldnames=csv_data[0].keys())
+            writer.writeheader()
+            writer.writerows(csv_data)
     
     print(f"Rules exported to {filepath}")
     return filepath
 
-# Run with best parameters - modified to include ensemble rules
-# --- In run_with_best_params: Pass a unique run_seed for each run and remove pickle export ---
-def run_with_best_params(study, results_dir, num_runs=3):
+
+import os
+import csv
+import traceback
+
+def safe_float(val):
+    try:
+        return float(val)
+    except:
+        return 0.0
+
+def safe_int(val):
+    try:
+        return int(val)
+    except:
+        return 0
+
+# --- Main function ---
+def run_with_best_params(study, results_dir, num_runs=1):
     best_params = study.best_trial.params
     optimized_config = BASE_CONFIG.copy()
     optimized_config.update(best_params)
     optimized_config['num_runs'] = num_runs  # Use multiple runs for final result
-    
+
     print("\n===== Running with optimized parameters =====")
     print(f"Configuration: {optimized_config}")
-    
+
     try:
         total_frauds = original_dt['Class'].sum()
         print(f"Total frauds in dataset: {total_frauds}")
-        
+
         all_rules = []
         all_ensemble_rules = []
         all_detected_indices = set()
-        
+
         for run in range(num_runs):
-            # Set a unique seed for each run
             optimized_config["run_seed"] = run + 1
             print(f"\n=== Run {run+1}/{num_runs} with run_seed = {optimized_config['run_seed']} ===")
             rules, ensemble_rules, _ = discover_rules_with_config(optimized_config)
-            
+
             for r in rules:
                 r['run'] = run + 1
                 all_rules.append(r)
                 all_detected_indices.update(r['rule_indices'])
-            
+
             for e in ensemble_rules:
+                # Ensure numeric fields are correctly typed
+                e['subset_size'] = safe_int(e.get('subset_size'))
+                e['fraud_rate'] = safe_float(e.get('fraud_rate'))
+                e['fraud_count'] = safe_int(e.get('fraud_count'))
                 e['run'] = run + 1
                 all_ensemble_rules.append(e)
-        
+
         detected_data = original_dt.loc[list(all_detected_indices)]
         detected_frauds = detected_data['Class'].sum()
-        
+
         best_ensemble_detection = 0
         if all_ensemble_rules:
             all_ensemble_rules.sort(key=lambda x: x['fraud_count'], reverse=True)
             best_ensemble_detection = all_ensemble_rules[0]['fraud_count']
-        
+
         print("\n===== Final Results =====")
         print(f"Total individual rules discovered: {len(all_rules)}")
         print(f"Total ensemble rules created: {len(all_ensemble_rules)}")
         print(f"Unique frauds detected by individual rules: {detected_frauds} out of {total_frauds} ({detected_frauds/total_frauds:.4%})")
-        if best_ensemble_detection > 0:
-            print(f"Best ensemble rule detects {best_ensemble_detection} frauds ({best_ensemble_detection/total_frauds:.4%} of all frauds)")
-        
+        try :
+            if best_ensemble_detection > 0:
+                print(f"Best ensemble rule detects {best_ensemble_detection} frauds ({best_ensemble_detection/total_frauds:.4%} of all frauds)")
+        except:
+            print(f"No ensemble rules found")
+
         csv_path = export_rules_to_csv(all_rules, results_dir, "optimized_rules.csv")
         if all_ensemble_rules:
             ensemble_csv_path = export_ensemble_rules_to_csv(all_ensemble_rules, all_rules, results_dir, "optimized_ensemble_rules.csv")
-        
+
         summary_path = os.path.join(results_dir, "summary.csv")
         with open(summary_path, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['Total Rules', 'Total Ensemble Rules', 'Total Frauds', 'Detected Frauds (Individual)', 
-                          'Detection Rate (Individual)', 'Best Ensemble Detection'])
-            writer.writerow([len(all_rules), len(all_ensemble_rules), total_frauds, detected_frauds, 
-                          detected_frauds/total_frauds, best_ensemble_detection])
-        
+            writer.writerow(['Total Rules', 'Total Ensemble Rules', 'Total Frauds', 'Detected Frauds (Individual)',
+                             'Detection Rate (Individual)', 'Best Ensemble Detection'])
+            writer.writerow([len(all_rules), len(all_ensemble_rules), total_frauds, detected_frauds,
+                             detected_frauds/total_frauds, best_ensemble_detection])
         print(f"Summary exported to {summary_path}")
-        
+
         config_path = os.path.join(results_dir, "best_config.csv")
         with open(config_path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['Parameter', 'Value'])
             for param, value in optimized_config.items():
                 writer.writerow([param, value])
-        
         print(f"Configuration exported to {config_path}")
-        
+
         all_rules.sort(key=lambda x: x['fraud_count'], reverse=True)
-        
+
         print("\nTop 5 individual rules:")
         for i, rule in enumerate(all_rules[:5]):
             print(f"\nRule #{i+1} (from Run {rule['run']}):")
             for feat, thresh in rule['rule'].items():
-                print(f"  if {feat} {thresh:.4f}")
+                print(f"  if {feat} {float(thresh):.4f}")
             print(f"Fraud count: {rule['fraud_count']} ({rule['fraud_rate']:.4%} precision)")
-        
+
         if all_ensemble_rules:
             print("\nTop 3 ensemble rules:")
             for i, ensemble in enumerate(all_ensemble_rules[:3]):
                 print(f"\nEnsemble Rule #{i+1} (from Run {ensemble['run']}): {ensemble['rule']}")
                 print(f"Subset size: {ensemble['subset_size']:,}")
-                print(f"Fraud rate: {ensemble['fraud_rate']:.4%}")
+                print(f"Fraud rate: {ensemble[float('fraud_rate')]:.4%}")
                 print(f"Fraud count: {ensemble['fraud_count']}")
-        
+
         return all_rules, all_ensemble_rules, detected_frauds/total_frauds
-        
+
     except Exception as e:
-        import traceback
         print(f"Error running with best parameters: {e}")
         traceback.print_exc()
         return [], [], 0
@@ -661,7 +699,7 @@ def run_full_workflow(n_trials=30):
     return study, best_rules, best_ensemble_rules, results_dir
 
 if __name__ == "__main__":
-    run_full_workflow(n_trials=32)
+    run_full_workflow(n_trials=1)
     end_time = time.time()
     print(f"Time taken to load run_full_workflow: {end_time - start_time:.2f} seconds")
 

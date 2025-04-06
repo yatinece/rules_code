@@ -1,0 +1,2 @@
+Ensemble_Rule_Number,Component_Rules,Component_Details,Subset_Size,Fraud_Rate,Fraud_Count
+1,Rule #1 OR Rule #2,Rule 1: V2 > 0.7531; V16 < 0.3812 | Rule 2: V6 > 0.1958; V11 > 0.5916; V13 < 0.6152,6924,0.056470248411322935,391

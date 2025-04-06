@@ -20,7 +20,7 @@ BASE_CONFIG = {
     'min_subset_size_absolute': 50,  # Minimum number of transactions in a subset
     'min_subset_size_percent': 0.005, # Minimum subset size as percent of data (0.5%)
     'max_iterations': 12,            # Maximum iterations per run
-    'num_runs': 3,                   # Number of runs with different random seeds
+    'num_runs': 1,                   # Number of runs with different random seeds
     
     # Genetic Algorithm Parameters
     'ga_num_generations': 150,       # Number of generations for genetic algorithm
@@ -49,7 +49,9 @@ if torch.cuda.is_available():
     device = torch.device('cuda')
 else:
     device = torch.device('cpu')
-# Create time-based results directory
+
+print(f"Using device: {device}")    
+# Create time-based results directory   
 def create_results_directory():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"fraud_detection_results_{timestamp}"
@@ -385,7 +387,7 @@ def objective(trial):
         'min_subset_size_absolute': trial.suggest_int('min_subset_size_absolute', 30, 200),
         'min_subset_size_percent': trial.suggest_float('min_subset_size_percent', 0.001, 0.02),
         'max_iterations': trial.suggest_int('max_iterations', 5, 20),
-        'num_runs':  trial.suggest_int('num_runs',1, 3),
+        'num_runs':  trial.suggest_int('num_runs',1, 1),
         
         # Genetic Algorithm Parameters
         'ga_num_generations': trial.suggest_int('ga_num_generations', 50, 300),
@@ -397,7 +399,7 @@ def objective(trial):
         # Rule Diversity Parameters
         'feature_reuse_penalty': trial.suggest_float('feature_reuse_penalty', 0.1, 0.8),
         'min_threshold_value': trial.suggest_float('min_threshold_value', 0.0001, 0.01),
-        'LESS_LOOKUP_RULE_POSITION' : trial.suggest_int('max_features_per_rule', 3, 9)
+        'LESS_LOOKUP_RULE_POSITION' : trial.suggest_int('LESS_LOOKUP_RULE_POSITION', 3, 9)
     }
     
     print(f"\n=== Starting trial {trial.number} ===")
@@ -427,7 +429,9 @@ def objective(trial):
         trial.set_user_attr("fraud_detection_rate", fraud_detection_rate)
         trial.set_user_attr("num_ensemble_rules", len(ensemble_rules))
         trial.set_user_attr("best_ensemble_score", best_ensemble_score)
-        
+        print(f"--------------------------------"*10)
+        print(f"Score: {score}")
+        print(f"--------------------------------"*10)
         return score
     
     except Exception as e:
@@ -439,7 +443,7 @@ def run_optimization(n_trials=50, study_name="fraud_detection_optimization"):
 
     if BASE_CONFIG['new_study_only'] == True:
         try :
-            optuna.delete_study(study_name="fraud_detection_optuna", storage="sqlite:///fraud_detection_optuna.db")
+            optuna.delete_study(study_name=study_name, storage="sqlite:///fraud_detection_optuna.db")
         except:
             pass
 
@@ -496,7 +500,7 @@ def export_rules_to_csv(rules, results_dir, filename="rules.csv"):
 
 # Run with best parameters - modified to include ensemble rules
 # --- In run_with_best_params: Pass a unique run_seed for each run and remove pickle export ---
-def run_with_best_params(study, results_dir, num_runs=3):
+def run_with_best_params(study, results_dir, num_runs=1):
     best_params = study.best_trial.params
     optimized_config = BASE_CONFIG.copy()
     optimized_config.update(best_params)
@@ -661,7 +665,7 @@ def run_full_workflow(n_trials=30):
     return study, best_rules, best_ensemble_rules, results_dir
 
 if __name__ == "__main__":
-    run_full_workflow(n_trials=32)
+    run_full_workflow(n_trials=4)
     end_time = time.time()
     print(f"Time taken to load run_full_workflow: {end_time - start_time:.2f} seconds")
 
