@@ -1,0 +1,24 @@
+.venv/
+.conda/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and debug files
+*.log
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Databases and zipped data
+*.db
+*.zip
+
+# VS Code settings (optional)
+.vscode/

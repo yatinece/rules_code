@@ -1,0 +1,36 @@
+
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+scipy
+scikit-fuzzy
+vllm
+transformers
+datasets
+accelerate
+wheel
+bitsandbytes
+unsloth 
+transformers 
+trl 
+peft 
+accelerate 
+bitsandbytes 
+datasets
+evaluate
+openpyxl
+weave
+optuna
+pygad
+plotly
+ruleopt
+xgboost
+
+#--index-url https://download.pytorch.org/whl/cu126
+
+# Install packages
+# pip3 install -r requirements.txt --index-url https://download.pytorch.org/whl/cu126
+# pip install flash-attn --no-build-isolation
+# pip install vllm --no-build-isolation
