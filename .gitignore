@@ -22,3 +22,5 @@ venv/
 
 # VS Code settings (optional)
 .vscode/
+
+creditcardfraud/creditcard.csv
